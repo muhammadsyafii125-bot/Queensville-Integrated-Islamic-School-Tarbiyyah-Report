@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Tarbiyyah: Portal Laporan Prestasi Pelajar</title>
+    <!-- Tailwind CSS untuk Reka Bentuk Premium -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js untuk Carta Spider Web -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PapaParse untuk Membaca CSV dari Google Sheets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Font Awesome untuk Ikon Menarik -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Plus Jakarta Sans & Amiri) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        arabic: ['Amiri', 'serif'],
+                    },
+                    colors: {
+                        emerald: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        },
+                        amber: {
+                            50: '#fffbeb',
+                            100: '#fef3c7',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c5c5c5;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-800 min-h-screen flex flex-col antialiased">
+
+    <!-- Header / Navbar Utama -->
+    <header class="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white shadow-xl border-b-4 border-amber-500 sticky top-0 z-50 transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-br from-amber-400 to-amber-600 p-2.5 rounded-xl shadow-lg border border-amber-300 transform hover:rotate-6 transition-transform">
+                    <i class="fa-solid fa-mosque text-emerald-950 text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-extrabold tracking-wide flex items-center gap-2">
+                        <span>E-TARBIYYAH</span>
+                        <span class="text-xs bg-amber-500 text-emerald-950 font-bold px-2 py-0.5 rounded-full uppercase" id="badge-ptm">PTM 2026</span>
+                    </h1>
+                    <p class="text-xs text-emerald-100 font-medium" id="sub-header">Sistem Laporan Pembangunan Sahsiah & Amalan Pelajar</p>
+                </div>
+            </div>
+
+            <!-- Kawalan Atas (Carian, Bahasa, Hubungi) -->
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+                <!-- Pilihan Bahasa Toggle -->
+                <div class="bg-emerald-950/50 p-1 rounded-full border border-emerald-700/50 flex">
+                    <button id="lang-ms" onclick="setLanguage('ms')" class="px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 bg-amber-500 text-emerald-950 shadow-md">
+                        Melayu
+                    </button>
+                    <button id="lang-en" onclick="setLanguage('en')" class="px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 text-emerald-200 hover:text-white">
+                        English
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Kandungan Utama -->
+    <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Status Loading & Error Alert -->
+        <div id="loader-container" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center transition-all duration-300">
+            <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border-t-4 border-emerald-600">
+                <div class="animate-spin text-emerald-600 text-5xl mb-4">
+                    <i class="fa-solid fa-spinner"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800" id="load-title">Memuatkan Data Penilaian...</h3>
+                <p class="text-sm text-slate-500 mt-2" id="load-desc">Sila tunggu sebentar, sistem sedang menghubungkan pangkalan data Google Sheets.</p>
+            </div>
+        </div>
+
+        <div id="error-alert" class="hidden bg-amber-50 border-l-4 border-amber-500 p-4 rounded-xl mb-6 shadow-md">
+            <div class="flex items-start">
+                <div class="flex-shrink-0 text-amber-500 text-xl">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-semibold text-amber-800" id="err-title">Pemberitahuan Sistem</p>
+                    <p class="text-xs text-amber-700 mt-1" id="err-desc">Menggunakan data simulasi luar talian kerana ralat sambungan ke Google Sheets. Anda tetap boleh meneruskan pembentangan!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Atas: Kad Pemilihan Pelajar -->
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6 mb-8 transition-all hover:shadow-lg">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-graduation-cap text-emerald-600"></i>
+                        <span id="select-student-title">Pilih Pelajar & Papar Laporan</span>
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-500 mt-1" id="select-student-desc">Pilih nama anak/pelajar anda untuk melihat ulasan prestasi Tarbiyyah yang komprehensif.</p>
+                </div>
+                
+                <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    <!-- Penapis Kelas -->
+                    <div class="relative w-full sm:w-48">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400 text-sm">
+                            <i class="fa-solid fa-door-open"></i>
+                        </span>
+                        <select id="class-filter" onchange="filterStudents()" class="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all appearance-none cursor-pointer">
+                            <option value="ALL">Semua Kelas / All</option>
+                        </select>
+                    </div>
+                    <!-- Menu Carian Nama Pelajar -->
+                    <div class="relative w-full sm:w-72">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400 text-sm">
+                            <i class="fa-solid fa-user-check"></i>
+                        </span>
+                        <select id="student-selector" onchange="selectStudent()" class="w-full pl-9 pr-4 py-2.5 bg-emerald-50/60 border border-emerald-200 text-emerald-950 font-semibold rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all appearance-none cursor-pointer">
+                            <option value="" disabled selected id="placeholder-select">Sila Pilih Pelajar...</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seksyen Paparan Laporan Pelajar (Akan aktif apabila pelajar dipilih) -->
+        <div id="student-report-card" class="hidden space-y-8 animate-[fadeIn_0.5s_ease-out]">
+            
+            <!-- Bahagian Profil & Skor Ringkas -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- Kad Profil Individu & Kategori Prestasi -->
+                <div class="bg-gradient-to-b from-white to-emerald-50/20 rounded-2xl shadow-md border border-slate-100 p-6 flex flex-col justify-between relative overflow-hidden transition-all hover:shadow-lg">
+                    <div class="absolute -right-12 -top-12 text-emerald-600/5 text-[10rem] font-arabic select-none pointer-events-none">
+                        ت
+                    </div>
+                    <div>
+                        <!-- Header Kad Pelajar -->
+                        <div class="flex items-center gap-4">
+                            <div class="bg-emerald-100 text-emerald-800 font-extrabold text-xl w-14 h-14 rounded-full flex items-center justify-center border-2 border-emerald-300 shadow-sm" id="student-initial">
+                                AA
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-slate-800 leading-snug" id="student-name">Ahmad bin Ali</h3>
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-800 mt-1">
+                                    <i class="fa-solid fa-users text-[10px]"></i>
+                                    <span id="student-class">Kelas 5 Al-Farabi</span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Grid Markah Utama -->
+                        <div class="mt-8 grid grid-cols-2 gap-4">
+                            <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
+                                <p class="text-[10px] uppercase font-bold tracking-wider text-slate-400" id="lbl-overall">Skor Keseluruhan</p>
+                                <p class="text-3xl font-extrabold text-emerald-600 mt-1" id="overall-score">89.4%</p>
+                            </div>
+                            <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center flex flex-col justify-center items-center">
+                                <p class="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1" id="lbl-grade">Gred / Kategori</p>
+                                <span class="px-2.5 py-1 rounded-full text-xs font-extrabold text-center block w-full truncate shadow-sm" id="grade-badge">
+                                    MUMTAZ
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Maklum Balas Membina & Positif -->
+                        <div class="mt-6 bg-white p-5 rounded-xl border border-emerald-100 shadow-sm">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5 mb-2">
+                                <i class="fa-solid fa-heart-pulse"></i>
+                                <span id="lbl-feedback">Ulasan Pembinaan Jiwa</span>
+                            </h4>
+                            <p class="text-sm text-slate-600 leading-relaxed italic" id="constructive-feedback">
+                                "Pelajar menunjukkan komitmen yang cemerlang dalam amalan harian khususnya solat fardhu dan adab. Teruskan istiqamah dan jadilah contoh yang baik kepada rakan-rakan sekeliling."
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-100 pt-4 mt-6 text-[10px] text-slate-400 flex justify-between items-center">
+                        <span id="lbl-ptm-session">Sesi Pertemuan Ibu Bapa & Guru</span>
+                        <span class="font-semibold text-emerald-700">Tarbiyyah 2026</span>
+                    </div>
+                </div>
+
+                <!-- Kad Spider Web Chart (Carta Radar) -->
+                <div class="lg:col-span-2 bg-white rounded-2xl shadow-md border border-slate-100 p-6 flex flex-col justify-between transition-all hover:shadow-lg">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-emerald-600"></i>
+                            <span id="chart-title">Carta Radar Potensi Tarbiyyah</span>
+                        </h3>
+                        <span class="text-xs text-slate-400 italic hidden sm:inline" id="chart-subtitle">Analisis Spider Web (0-100)</span>
+                    </div>
+                    
+                    <div class="relative flex-grow min-h-[300px] md:min-h-[340px] flex items-center justify-center">
+                        <canvas id="tarbiyyahRadarChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Analisis Berdasarkan Kluster Tarbiyyah -->
+            <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6 transition-all hover:shadow-lg">
+                <h3 class="font-bold text-slate-800 text-base sm:text-lg flex items-center gap-2 border-b border-slate-100 pb-4 mb-6">
+                    <i class="fa-solid fa-list-check text-emerald-600"></i>
+                    <span id="breakdown-title">Pecahan Prestasi Amalan & Sahsiah</span>
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    
+                    <!-- Kluster 1: Ibadat & Disiplin Asas (Fardhu Ain) -->
+                    <div class="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-4 border-b border-slate-200/60 pb-2">
+                                <span class="bg-emerald-600 text-white p-1.5 rounded-lg text-xs">
+                                    <i class="fa-solid fa-book-open-reader"></i>
+                                </span>
+                                <h4 class="font-bold text-slate-800 text-sm" id="cluster-1-title">Asas Ibadah & Disiplin</h4>
+                            </div>
+                            <div class="space-y-4" id="cluster-1-list">
+                                <!-- Dinamik diganti dari JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kluster 2: Penghayatan Sunat & Nafilah -->
+                    <div class="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-4 border-b border-slate-200/60 pb-2">
+                                <span class="bg-amber-500 text-emerald-950 p-1.5 rounded-lg text-xs">
+                                    <i class="fa-solid fa-star-and-crescent"></i>
+                                </span>
+                                <h4 class="font-bold text-slate-800 text-sm" id="cluster-2-title">Amalan Sunat & Nafilah</h4>
+                            </div>
+                            <div class="space-y-4" id="cluster-2-list">
+                                <!-- Dinamik diganti dari JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kluster 3: Rohani & Sahsiah Kepimpinan -->
+                    <div class="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-4 border-b border-slate-200/60 pb-2">
+                                <span class="bg-teal-600 text-white p-1.5 rounded-lg text-xs">
+                                    <i class="fa-solid fa-hands-holding-child"></i>
+                                </span>
+                                <h4 class="font-bold text-slate-800 text-sm" id="cluster-3-title">Sahsiah, Rohani & Kepimpinan</h4>
+                            </div>
+                            <div class="space-y-4" id="cluster-3-list">
+                                <!-- Dinamik diganti dari JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Petunjuk Gred & Tips Sokongan -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Panduan Kategori Laporan -->
+                <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+                    <h4 class="font-bold text-slate-800 text-sm mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-info text-emerald-600"></i>
+                        <span id="legend-title">Panduan Skor & Pencapaian Tarbiyyah</span>
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div class="flex items-center gap-3 p-2 rounded-xl bg-emerald-50 border border-emerald-100">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                            <div>
+                                <p class="font-bold text-emerald-900" id="leg-mumtaz">85% - 100% : Cemerlang (Mumtaz)</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 p-2 rounded-xl bg-teal-50 border border-teal-100">
+                            <span class="w-2.5 h-2.5 rounded-full bg-teal-600"></span>
+                            <div>
+                                <p class="font-bold text-teal-900" id="leg-jayyid-jiddan">70% - 84% : Sangat Baik (Jayyid Jiddan)</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 p-2 rounded-xl bg-amber-50 border border-amber-100">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                            <div>
+                                <p class="font-bold text-amber-900" id="leg-jayyid">55% - 69% : Baik (Jayyid)</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 p-2 rounded-xl bg-orange-50 border border-orange-100">
+                            <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                            <div>
+                                <p class="font-bold text-orange-900" id="leg-maqbul">40% - 54% : Memuaskan (Maqbul)</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 p-2 rounded-xl bg-rose-50 border border-rose-100 sm:col-span-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                            <div>
+                                <p class="font-bold text-rose-900" id="leg-dhaif">Bawah 40% : Perlu Bimbingan Tambahan (Muqarab/Dhaif)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tips Motivasi PTM -->
+                <div class="bg-gradient-to-br from-emerald-800 to-teal-900 text-white rounded-2xl shadow-md p-6 flex flex-col justify-between relative overflow-hidden">
+                    <div class="absolute -right-8 -bottom-8 text-white/5 text-8xl">
+                        <i class="fa-solid fa-hand-holding-heart"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-sm mb-3 flex items-center gap-2 text-amber-400">
+                            <i class="fa-solid fa-heart"></i>
+                            <span id="tips-title">Sokongan Ibu Bapa di Rumah</span>
+                        </h4>
+                        <p class="text-xs sm:text-sm text-emerald-100 leading-relaxed" id="tips-body">
+                            "Pendidikan Tarbiyyah adalah satu perjalanan panjang bagi menyuburkan nilai murni dan disiplin insani dalam diri anak kita. Berikan penghargaan atas pencapaian cemerlang mereka, dan bimbinglah dengan penuh sabar bagi subjek yang masih memerlukan pembaikan."
+                        </p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-emerald-700/50 flex justify-between items-center text-[10px] text-emerald-300">
+                        <span id="tips-author">Nasihat Tarbiyyah Ustaz Syafii</span>
+                        <i class="fa-solid fa-feather-pointed"></i>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Placeholder Sila Pilih Pelajar di Bahagian Bawah -->
+        <div id="no-selection-placeholder" class="bg-white rounded-2xl shadow-md border border-slate-100 p-12 text-center flex flex-col items-center justify-center min-h-[300px]">
+            <div class="bg-emerald-50 text-emerald-600 p-5 rounded-full text-4xl mb-4 border border-emerald-100 animate-pulse">
+                <i class="fa-solid fa-address-book"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-800" id="placeholder-title">Menanti Pemilihan Pelajar</h3>
+            <p class="text-sm text-slate-500 max-w-md mt-2 leading-relaxed" id="placeholder-desc">Sila pilih nama pelajar dari menu di atas untuk menjana analisis carta spider web, skor purata, gred, dan ulasan tarbiyyah tersuai.</p>
+        </div>
+
+    </main>
+
+    <!-- Footer Laporan -->
+    <footer class="bg-slate-900 text-slate-400 py-8 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
+            <div>
+                <p class="text-sm font-semibold text-slate-200" id="footer-system-name">E-Tarbiyyah Dashboard — Parent-Teacher Meeting (PTM)</p>
+                <p class="text-xs text-slate-500 mt-1" id="footer-copyright">Sistem pemantauan bersepadu amalan harian, pembentukan sahsiah & rukun ibadat.</p>
+            </div>
+            <div class="flex flex-col items-center sm:items-end gap-1">
+                <span class="text-xs bg-emerald-950/80 text-emerald-400 font-bold px-3 py-1.5 rounded-lg border border-emerald-800/60 shadow-sm">
+                    created by Ustaz Syafii
+                </span>
+                <span class="text-[10px] text-slate-600 mt-1">Sesi Akademik 2026/2027</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Logik & Pengaturcaraan JavaScript -->
+    <script>
+        // Pangkalan Data Global
+        let studentsData = [];
+        let selectedStudentData = null;
+        let currentLanguage = 'ms'; // Nilai lalai: Bahasa Melayu
+        let radarChartInstance = null;
+
+        // URL Google Sheets CSV (Pautan Anda)
+        const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQVitAG12T0iUbHccycjVGmKoS4KYWcGfrTjin2fV4yfYr0yj7RsGhcU6oG6zMbYPRcGposBDukkTi1/pub?gid=0&single=true&output=csv';
+
+        // Definisi Header dan Kluster Laporan
+        const metrics = [
+            { key: 'Solat', labelMs: 'Solat Fardhu', labelEn: 'Obligatory Prayers', cluster: 1, icon: 'fa-person-praying' },
+            { key: 'Taharah', labelMs: 'Taharah (Wuduk)', labelEn: 'Purification (Wudu)', cluster: 1, icon: 'fa-soap' },
+            { key: 'Adab', labelMs: 'Adab & Akhlak', labelEn: 'Manners & Akhlaq', cluster: 1, icon: 'fa-universal-access' },
+            { key: 'Quranic', labelMs: 'Quranic (Tila/Hafz)', labelEn: 'Quran Recitation', cluster: 1, icon: 'fa-book-quran' },
+            { key: 'Zikir', labelMs: 'Zikir & Wirid', labelEn: 'Dhikr & Remembrance', cluster: 2, icon: 'fa-ellipsis-h' },
+            { key: 'Quranic+', labelMs: 'Quranic+ (Tadabbur)', labelEn: 'Quran Reflection', cluster: 2, icon: 'fa-graduation-cap' },
+            { key: 'Solat Sunat', labelMs: 'Solat Sunat', labelEn: 'Voluntary Prayers', cluster: 2, icon: 'fa-heart' },
+            { key: 'Puasa Sunat', labelMs: 'Puasa Sunat', labelEn: 'Voluntary Fasting', cluster: 2, icon: 'fa-person-running' },
+            { key: 'Sedekah', labelMs: 'Sedekah/Infaq', labelEn: 'Charity/Sadaqah', cluster: 3, icon: 'fa-hand-holding-dollar' },
+            { key: 'Muraqabah', labelMs: 'Muraqabah (Fokus)', labelEn: 'Self-Awareness', cluster: 3, icon: 'fa-brain' },
+            { key: 'Leadership', labelMs: 'Kepimpinan', labelEn: 'Leadership', cluster: 3, icon: 'fa-users' }
+        ];
+
+        // Kamus Bahasa (Penterjemah Dinamik)
+        const dictionary = {
+            ms: {
+                badgePtm: "PTM 2026",
+                subHeader: "Sistem Laporan Pembangunan Sahsiah & Amalan Pelajar",
+                selectStudentTitle: "Pilih Pelajar & Papar Laporan",
+                selectStudentDesc: "Pilih nama anak/pelajar anda untuk melihat ulasan prestasi Tarbiyyah yang komprehensif.",
+                allClasses: "Semua Kelas",
+                placeholderSelect: "Sila Pilih Pelajar...",
+                lblOverall: "Skor Keseluruhan",
+                lblGrade: "Gred Tarbiyyah",
+                lblFeedback: "Ulasan Pembinaan Jiwa",
+                lblPtmSession: "Sesi Pertemuan Ibu Bapa & Guru",
+                chartTitle: "Carta Radar Potensi Tarbiyyah",
+                chartSubtitle: "Analisis Spider Web (0-100)",
+                breakdownTitle: "Pecahan Prestasi Amalan & Sahsiah",
+                cluster1Title: "Asas Ibadah & Disiplin",
+                cluster2Title: "Amalan Sunat & Nafilah",
+                cluster3Title: "Sahsiah, Rohani & Kepimpinan",
+                legendTitle: "Panduan Skor & Pencapaian Tarbiyyah",
+                legMumtaz: "85% - 100% : Cemerlang (Mumtaz)",
+                legJayyidJiddan: "70% - 84% : Sangat Baik (Jayyid Jiddan)",
+                legJayyid: "55% - 69% : Baik (Jayyid)",
+                legMaqbul: "40% - 54% : Memuaskan (Maqbul)",
+                legDhaif: "Bawah 40% : Perlu Bimbingan (Muqarab/Dhaif)",
+                tipsTitle: "Sokongan Ibu Bapa di Rumah",
+                tipsBody: "Pendidikan Tarbiyyah adalah satu perjalanan panjang bagi menyuburkan nilai murni dan disiplin insani dalam diri anak kita. Berikan penghargaan atas pencapaian cemerlang mereka, dan bimbinglah dengan penuh sabar bagi subjek yang masih memerlukan pembaikan.",
+                tipsAuthor: "Nasihat Tarbiyyah Ustaz Syafii",
+                placeholderTitle: "Menanti Pemilihan Pelajar",
+                placeholderDesc: "Sila pilih nama pelajar dari menu di atas untuk menjana analisis carta spider web, skor purata, gred, dan ulasan tarbiyyah tersuai.",
+                footerSystemName: "E-Tarbiyyah Dashboard — Parent-Teacher Meeting (PTM)",
+                footerCopyright: "Sistem pemantauan bersepadu amalan harian, pembentukan sahsiah & rukun ibadat.",
+                loadTitle: "Memuatkan Data Penilaian...",
+                loadDesc: "Sila tunggu sebentar, sistem sedang menghubungkan pangkalan data Google Sheets.",
+                errTitle: "Pemberitahuan Sistem",
+                errDesc: "Menggunakan data simulasi luar talian kerana ralat sambungan ke Google Sheets. Anda tetap boleh meneruskan pembentangan!",
+                mumtaz: "MUMTAZ (CEMERLANG)",
+                jayyidJiddan: "JAYYID JIDDAN (SANGAT BAIK)",
+                jayyid: "JAYYID (BAIK)",
+                maqbul: "MAQBUL (MEMUASKAN)",
+                dhaif: "MUQARAB (BIMBINGAN)",
+                scoreText: "Skor",
+                noClass: "Tiada Kelas"
+            },
+            en: {
+                badgePtm: "PTM 2026",
+                subHeader: "Student Character Development & Practice Report System",
+                selectStudentTitle: "Select Student & View Report",
+                selectStudentDesc: "Select your child's/student's name to view a comprehensive Tarbiyyah performance analysis.",
+                allClasses: "All Classes",
+                placeholderSelect: "Please Select Student...",
+                lblOverall: "Overall Score",
+                lblGrade: "Tarbiyyah Grade",
+                lblFeedback: "Spiritual Development Feedback",
+                lblPtmSession: "Parent-Teacher Meeting Session",
+                chartTitle: "Tarbiyyah Potential Radar Chart",
+                chartSubtitle: "Spider Web Analysis (0-100)",
+                breakdownTitle: "Practice & Character Performance Breakdown",
+                cluster1Title: "Foundation Worship & Discipline",
+                cluster2Title: "Voluntary Practices & Nafilah",
+                cluster3Title: "Character, Spiritual & Leadership",
+                legendTitle: "Tarbiyyah Score & Achievement Guide",
+                legMumtaz: "85% - 100% : Excellent (Mumtaz)",
+                legJayyidJiddan: "70% - 84% : Very Good (Jayyid Jiddan)",
+                legJayyid: "55% - 69% : Good (Jayyid)",
+                legMaqbul: "40% - 54% : Satisfactory (Maqbul)",
+                legDhaif: "Below 40% : Needs Guidance (Muqarab/Dhaif)",
+                tipsTitle: "Parental Support at Home",
+                tipsBody: "Tarbiyyah education is a lifelong journey to nurture moral values and human discipline in our children. Praise them for their excellent achievements, and guide them with patience on subjects that still need improvement.",
+                tipsAuthor: "Tarbiyyah Advice from Ustaz Syafii",
+                placeholderTitle: "Awaiting Student Selection",
+                placeholderDesc: "Please choose a student from the dropdown menu above to generate custom spider web charts, overall scores, grades, and tailor-made feedback.",
+                footerSystemName: "E-Tarbiyyah Dashboard — Parent-Teacher Meeting (PTM)",
+                footerCopyright: "Integrated monitoring system for daily deeds, character building & religious pillars.",
+                loadTitle: "Loading Assessment Data...",
+                loadDesc: "Please wait, the system is connecting to the Google Sheets database.",
+                errTitle: "System Notification",
+                errDesc: "Using offline simulation data due to Google Sheets connection error. You can still proceed with your presentation!",
+                mumtaz: "MUMTAZ (EXCELLENT)",
+                jayyidJiddan: "JAYYID JIDDAN (VERY GOOD)",
+                jayyid: "JAYYID (GOOD)",
+                maqbul: "MAQBUL (SATISFACTORY)",
+                dhaif: "MUQARAB (DEVELOPING)",
+                scoreText: "Score",
+                noClass: "No Class"
+            }
+        };
+
+        // Data Simulasi Terbina (Fallback jika Google Sheet gagal dimuatkan)
+        const mockStudents = [
+            { "Kelas": "5 Al-Farabi", "Nama Pelajar": "AHMAD BIN AL-FATIHI", "Solat": "95", "Taharah": "90", "Adab": "98", "Zikir": "85", "Muraqabah": "80", "Quranic": "92", "Quranic+": "75", "Solat Sunat": "80", "Puasa Sunat": "60", "Sedekah": "90", "Leadership": "95" },
+            { "Kelas": "5 Al-Farabi", "Nama Pelajar": "AISYAH HUMAIRA BINTI ZAINAL", "Solat": "98", "Taharah": "95", "Adab": "100", "Zikir": "90", "Muraqabah": "88", "Quranic": "96", "Quranic+": "85", "Solat Sunat": "90", "Puasa Sunat": "70", "Sedekah": "95", "Leadership": "90" },
+            { "Kelas": "5 Al-Kindi", "Nama Pelajar": "HARITH IRFAN BIN MOHD SAFUAN", "Solat": "80", "Taharah": "75", "Adab": "85", "Zikir": "70", "Muraqabah": "65", "Quranic": "78", "Quranic+": "60", "Solat Sunat": "65", "Puasa Sunat": "40", "Sedekah": "75", "Leadership": "80" },
+            { "Kelas": "5 Al-Kindi", "Nama Pelajar": "MARYAM KHADIJAH BINTI ADNAN", "Solat": "92", "Taharah": "88", "Adab": "95", "Zikir": "80", "Muraqabah": "82", "Quranic": "90", "Quranic+": "70", "Solat Sunat": "75", "Puasa Sunat": "50", "Sedekah": "85", "Leadership": "88" },
+            { "Kelas": "5 Al-Farabi", "Nama Pelajar": "MUHAMMAD AMIN BIN SHAHRUL", "Solat": "65", "Taharah": "60", "Adab": "70", "Zikir": "50", "Muraqabah": "55", "Quranic": "65", "Quranic+": "45", "Solat Sunat": "40", "Puasa Sunat": "30", "Sedekah": "60", "Leadership": "50" }
+        ];
+
+        // Permulaan Aplikasi (App Initialization)
+        window.onload = function() {
+            loadTarbiyyahData();
+        };
+
+        // Membaca Data dari Google Sheets
+        function loadTarbiyyahData() {
+            document.getElementById('loader-container').classList.remove('opacity-0', 'pointer-events-none');
+            
+            Papa.parse(csvUrl, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    document.getElementById('loader-container').classList.add('opacity-0', 'pointer-events-none');
+                    if (results.data && results.data.length > 0 && results.data[0]['Nama Pelajar']) {
+                        studentsData = results.data;
+                        console.log("Data berjaya dimuatkan dari Google Sheets.", studentsData);
+                    } else {
+                        triggerMockData("Ralat format CSV");
+                    }
+                    initializeFilters();
+                },
+                error: function(err) {
+                    console.error("Ralat memuat data Google Sheet. Menggunakan mock data.", err);
+                    triggerMockData(err);
+                }
+            });
+        }
+
+        // Jalankan Data Simulasi jika terdapat kegagalan
+        function triggerMockData(reason) {
+            document.getElementById('loader-container').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('error-alert').classList.remove('hidden');
+            studentsData = mockStudents;
+            initializeFilters();
+        }
+
+        // Kemaskini Antaramuka Pilihan Kelas & Pelajar
+        function initializeFilters() {
+            const classFilter = document.getElementById('class-filter');
+            const studentSelector = document.getElementById('student-selector');
+
+            // Ekstrak senarai kelas unik
+            const classes = [...new Set(studentsData.map(item => item.Kelas || 'Tiada Kelas'))].filter(Boolean);
+            
+            // Set semula penapis kelas
+            classFilter.innerHTML = `<option value="ALL">${currentLanguage === 'ms' ? 'Semua Kelas' : 'All Classes'}</option>`;
+            classes.forEach(cls => {
+                const option = document.createElement('option');
+                option.value = cls;
+                option.textContent = cls;
+                classFilter.appendChild(option);
+            });
+
+            // Isi senarai pelajar awal
+            populateStudentsDropdown('ALL');
+        }
+
+        // Tapis Nama Pelajar mengikut kelas yang dipilih
+        function filterStudents() {
+            const selectedClass = document.getElementById('class-filter').value;
+            populateStudentsDropdown(selectedClass);
+            
+            // Tutup laporan sekiranya tiada pelajar sepadan dipilih semula
+            closeActiveReport();
+        }
+
+        function populateStudentsDropdown(classCriteria) {
+            const studentSelector = document.getElementById('student-selector');
+            studentSelector.innerHTML = `<option value="" disabled selected>${dictionary[currentLanguage].placeholderSelect}</option>`;
+
+            const filtered = studentsData.filter(student => {
+                if (!student['Nama Pelajar']) return false;
+                if (classCriteria === 'ALL') return true;
+                return (student.Kelas || 'Tiada Kelas') === classCriteria;
+            });
+
+            filtered.sort((a, b) => a['Nama Pelajar'].localeCompare(b['Nama Pelajar']));
+
+            filtered.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student['Nama Pelajar'];
+                option.textContent = `${student['Nama Pelajar']} (${student.Kelas || '-'})`;
+                studentSelector.appendChild(option);
+            });
+        }
+
+        // Sembunyikan bahagian kad laporan utama
+        function closeActiveReport() {
+            document.getElementById('student-report-card').classList.add('hidden');
+            document.getElementById('no-selection-placeholder').classList.remove('hidden');
+            selectedStudentData = null;
+        }
+
+        // Dipanggil apabila nama pelajar dipilih dari menu lungsur
+        function selectStudent() {
+            const selectedName = document.getElementById('student-selector').value;
+            selectedStudentData = studentsData.find(student => student['Nama Pelajar'] === selectedName);
+
+            if (selectedStudentData) {
+                document.getElementById('no-selection-placeholder').classList.add('hidden');
+                document.getElementById('student-report-card').classList.remove('hidden');
+                updateReportUI();
+            }
+        }
+
+        // Kemaskini bahasa dan gred secara dinamik
+        function setLanguage(lang) {
+            currentLanguage = lang;
+            
+            // Kemaskini gaya butang toggle
+            const btnMs = document.getElementById('lang-ms');
+            const btnEn = document.getElementById('lang-en');
+            if (lang === 'ms') {
+                btnMs.className = "px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 bg-amber-500 text-emerald-950 shadow-md";
+                btnEn.className = "px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 text-emerald-200 hover:text-white";
+            } else {
+                btnEn.className = "px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 bg-amber-500 text-emerald-950 shadow-md";
+                btnMs.className = "px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 text-emerald-200 hover:text-white";
+            }
+
+            // Terjemah semua komponen statik pada halaman
+            const elementsToTranslate = [
+                { id: 'badge-ptm', key: 'badgePtm' },
+                { id: 'sub-header', key: 'subHeader' },
+                { id: 'select-student-title', key: 'selectStudentTitle' },
+                { id: 'select-student-desc', key: 'selectStudentDesc' },
+                { id: 'lbl-overall', key: 'lblOverall' },
+                { id: 'lbl-grade', key: 'lblGrade' },
+                { id: 'lbl-feedback', key: 'lblFeedback' },
+                { id: 'lbl-ptm-session', key: 'lblPtmSession' },
+                { id: 'chart-title', key: 'chartTitle' },
+                { id: 'chart-subtitle', key: 'chartSubtitle' },
+                { id: 'breakdown-title', key: 'breakdownTitle' },
+                { id: 'cluster-1-title', key: 'cluster1Title' },
+                { id: 'cluster-2-title', key: 'cluster2Title' },
+                { id: 'cluster-3-title', key: 'cluster3Title' },
+                { id: 'legend-title', key: 'legendTitle' },
+                { id: 'leg-mumtaz', key: 'legMumtaz' },
+                { id: 'leg-jayyid-jiddan', key: 'legJayyidJiddan' },
+                { id: 'leg-jayyid', key: 'legJayyid' },
+                { id: 'leg-maqbul', key: 'legMaqbul' },
+                { id: 'leg-dhaif', key: 'legDhaif' },
+                { id: 'tips-title', key: 'tipsTitle' },
+                { id: 'tips-body', key: 'tipsBody' },
+                { id: 'tips-author', key: 'tipsAuthor' },
+                { id: 'placeholder-title', key: 'placeholderTitle' },
+                { id: 'placeholder-desc', key: 'placeholderDesc' },
+                { id: 'footer-system-name', key: 'footerSystemName' },
+                { id: 'footer-copyright', key: 'footerCopyright' },
+                { id: 'load-title', key: 'loadTitle' },
+                { id: 'load-desc', key: 'loadDesc' },
+                { id: 'err-title', key: 'errTitle' },
+                { id: 'err-desc', key: 'errDesc' }
+            ];
+
+            elementsToTranslate.forEach(item => {
+                const el = document.getElementById(item.id);
+                if (el) el.textContent = dictionary[lang][item.key];
+            });
+
+            // Kemaskini nama pemegang tempat (placeholder) pada selector
+            const placeholder = document.getElementById('placeholder-select');
+            if (placeholder) placeholder.textContent = dictionary[lang].placeholderSelect;
+
+            // Memuat semula penapis & laporan sekiranya ada data aktif
+            const classFilter = document.getElementById('class-filter');
+            const currentClassValue = classFilter.value;
+            classFilter.options[0].text = lang === 'ms' ? 'Semua Kelas' : 'All Classes';
+
+            if (selectedStudentData) {
+                updateReportUI();
+            }
+        }
+
+        // Hitung Kategori & Ulasan Automatik Berdasarkan Gred
+        function getPerformanceCategory(score) {
+            let cat = {};
+            if (score >= 85) {
+                cat.title = dictionary[currentLanguage].mumtaz;
+                cat.class = "bg-emerald-100 text-emerald-800 border-emerald-300";
+                cat.commentMs = "Alhamdulillah! Pelajar menunjukkan penguasaan tarbiyyah yang sangat cemerlang. Tahniah atas keteguhan disiplin rohani ini. Semoga terus istiqamah mendaki tangga kebaikan.";
+                cat.commentEn = "Alhamdulillah! The student exhibits exceptional discipline in all Tarbiyyah practices. Excellent moral character. May they continue steadfastly on this righteous path.";
+            } else if (score >= 70) {
+                cat.title = dictionary[currentLanguage].jayyidJiddan;
+                cat.class = "bg-teal-100 text-teal-800 border-teal-300";
+                cat.commentMs = "Syabas! Prestasi rohani dan sahsiah pelajar amat terpuji. Kebanyakan amalan wajib dipenuhi dengan baik. Sedikit dorongan lagi untuk mengistiqamahkan amalan-amalan sunat.";
+                cat.commentEn = "Bravo! The student's spiritual progress is highly commendable. Obligatory duties are well established. Just a minor boost is needed to consistently incorporate voluntary practices.";
+            } else if (score >= 55) {
+                cat.title = dictionary[currentLanguage].jayyid;
+                cat.class = "bg-amber-100 text-amber-800 border-amber-300";
+                cat.commentMs = "Alhamdulillah, pencapaian yang memuaskan. Potensi diri pelajar masih tinggi untuk berkembang. Bimbingan berterusan amat diperlukan bagi mengekalkan disiplin ibadah fardhu.";
+                cat.commentEn = "Alhamdulillah, a satisfying performance. The student holds high potential for growth. Continued parental guidance is encouraged to stabilize basic obligatory practices.";
+            } else if (score >= 40) {
+                cat.title = dictionary[currentLanguage].maqbul;
+                cat.class = "bg-orange-100 text-orange-800 border-orange-300";
+                cat.commentMs = "Pelajar berjaya melengkapkan beberapa kriteria dengan bimbingan. Mari kita tingkatkan kerjasama erat di rumah dan sekolah bagi meningkatkan fokus amalan fardhu.";
+                cat.commentEn = "The student completes several criteria with assistance. Let us work hand-in-hand between home and school to uplift their focus on daily spiritual core habits.";
+            } else {
+                cat.title = dictionary[currentLanguage].dhaif;
+                cat.class = "bg-rose-100 text-rose-800 border-rose-300";
+                cat.commentMs = "Satu peluang keemasan untuk pembetulan. Pelajar memerlukan bimbingan mesra secara konsisten untuk membaiki disiplin asas. Doa dan kesabaran kita pasti membuahkan hasil.";
+                cat.commentEn = "A golden opportunity for positive change. The student requires dedicated, gentle counseling to nurture basic habits. Constant prayer and patience will yield fruit.";
+            }
+            return cat;
+        }
+
+        // Kemaskini Segala Widget & Paparan UI Laporan Pelajar
+        function updateReportUI() {
+            if (!selectedStudentData) return;
+
+            // 1. Maklumat Profil Pelajar
+            const name = selectedStudentData['Nama Pelajar'];
+            document.getElementById('student-name').textContent = name;
+            document.getElementById('student-class').textContent = selectedStudentData.Kelas || dictionary[currentLanguage].noClass;
+
+            // Inisial Nama Pelajar (cth: "Ahmad bin Ali" -> "AA")
+            const words = name.split(' ');
+            let initial = '';
+            if (words.length > 0) initial += words[0].charAt(0).toUpperCase();
+            if (words.length > 1) {
+                // Elakkan perkataan bin/binti sebagai inisial jika ada nama kedua
+                let secondWord = words[1].toLowerCase();
+                if ((secondWord === 'bin' || secondWord === 'binti' || secondWord === 'bt' || secondWord === 'b') && words[2]) {
+                    initial += words[2].charAt(0).toUpperCase();
+                } else {
+                    initial += words[1].charAt(0).toUpperCase();
+                }
+            }
+            document.getElementById('student-initial').textContent = initial;
+
+            // 2. Pengiraan Purata Skor Tarbiyyah
+            let total = 0;
+            let count = 0;
+            metrics.forEach(m => {
+                const val = parseFloat(selectedStudentData[m.key]);
+                if (!isNaN(val)) {
+                    total += val;
+                    count++;
+                }
+            });
+            const average = count > 0 ? (total / count).toFixed(1) : 0;
+            document.getElementById('overall-score').textContent = `${average}%`;
+
+            // 3. Gred & Kategori Maklum Balas Positif
+            const cat = getPerformanceCategory(average);
+            const badge = document.getElementById('grade-badge');
+            badge.className = `px-2.5 py-1 rounded-full text-xs font-extrabold text-center block w-full truncate border shadow-sm ${cat.class}`;
+            badge.textContent = cat.title;
+
+            // Papar ulasan dalam bahasa yang dipilih
+            document.getElementById('constructive-feedback').textContent = currentLanguage === 'ms' ? `"${cat.commentMs}"` : `"${cat.commentEn}"`;
+
+            // 4. Pembinaan Senarai Kluster Tarbiyyah (Pecahan Progress Bars)
+            renderClusters();
+
+            // 5. Kemaskini Spider Web Chart (Radar Chart)
+            renderRadarChart();
+        }
+
+        // Fungsi Menjana Progress Bar Setiap Subjek Mengikut Kluster
+        function renderClusters() {
+            // Bersihkan semua list kluster terlebih dahulu
+            const lists = {
+                1: document.getElementById('cluster-1-list'),
+                2: document.getElementById('cluster-2-list'),
+                3: document.getElementById('cluster-3-list')
+            };
+
+            lists[1].innerHTML = '';
+            lists[2].innerHTML = '';
+            lists[3].innerHTML = '';
+
+            metrics.forEach(m => {
+                const score = parseFloat(selectedStudentData[m.key]) || 0;
+                const label = currentLanguage === 'ms' ? m.labelMs : m.labelEn;
+
+                // Tentukan warna progress bar
+                let progressColor = 'bg-emerald-600';
+                if (score < 40) progressColor = 'bg-rose-500';
+                else if (score < 55) progressColor = 'bg-orange-500';
+                else if (score < 70) progressColor = 'bg-amber-500';
+                else if (score < 85) progressColor = 'bg-teal-600';
+
+                const html = `
+                    <div class="group">
+                        <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+                            <span class="flex items-center gap-1.5 truncate">
+                                <i class="fa-solid ${m.icon} text-slate-400 text-[10px] group-hover:text-emerald-600 transition-colors"></i>
+                                <span class="truncate">${label}</span>
+                            </span>
+                            <span class="font-bold">${score}/100</span>
+                        </div>
+                        <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden shadow-inner">
+                            <div class="${progressColor} h-2 rounded-full transition-all duration-1000 ease-out" style="width: ${score}%"></div>
+                        </div>
+                    </div>
+                `;
+
+                lists[m.cluster].insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        // Fungsi Membina / Mengemas kini Carta Spider Web (Chart.js)
+        function renderRadarChart() {
+            const ctx = document.getElementById('tarbiyyahRadarChart').getContext('2d');
+
+            // Susun label & data untuk carta berdasarkan bahasa semasa
+            const labels = metrics.map(m => currentLanguage === 'ms' ? m.labelMs : m.labelEn);
+            const dataValues = metrics.map(m => parseFloat(selectedStudentData[m.key]) || 0);
+
+            // Musnahkan carta sedia ada sekiranya bertukar pelajar/bahasa
+            if (radarChartInstance) {
+                radarChartInstance.destroy();
+            }
+
+            radarChartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: currentLanguage === 'ms' ? 'Pencapaian Semasa' : 'Current Achievement',
+                        data: dataValues,
+                        backgroundColor: 'rgba(5, 150, 105, 0.2)', // Hijau Emerald Transparan
+                        borderColor: 'rgba(4, 120, 87, 1)', // Hijau Pekat
+                        borderWidth: 2.5,
+                        pointBackgroundColor: 'rgba(245, 158, 11, 1)', // Gangsa/Emas
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(4, 120, 87, 1)',
+                        pointRadius: 4,
+                        pointHitRadius: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false // Sembunyi legenda untuk kekemasan maksima
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.dataset.label}: ${context.raw}/100`;
+                                }
+                            },
+                            titleFont: {
+                                family: 'Plus Jakarta Sans',
+                                size: 12,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                family: 'Plus Jakarta Sans',
+                                size: 11
+                            }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: {
+                                display: true,
+                                color: 'rgba(226, 232, 240, 0.8)'
+                            },
+                            grid: {
+                                color: 'rgba(226, 232, 240, 0.8)'
+                            },
+                            pointLabels: {
+                                font: {
+                                    family: 'Plus Jakarta Sans',
+                                    size: window.innerWidth < 640 ? 8.5 : 10,
+                                    weight: 'bold'
+                                },
+                                color: '#1e293b'
+                            },
+                            ticks: {
+                                showLabelBackdrop: false,
+                                font: {
+                                    size: 9,
+                                    family: 'Plus Jakarta Sans'
+                                },
+                                color: '#64748b',
+                                stepSize: 20
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 100
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
